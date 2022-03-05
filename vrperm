@@ -1,0 +1,50 @@
+#!/usr/bin/python3
+#	vrperm - Create verifiably pseudorandom permutations
+#	Copyright (C) 2022-2022 Johannes Bauer
+#
+#	This file is part of vrperm.
+#
+#	vrperm is free software; you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation; this program is ONLY licensed under
+#	version 3 of the License, later versions are explicitly excluded.
+#
+#	vrperm is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with vrperm; if not, write to the Free Software
+#	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+#	Johannes Bauer <JohannesBauer@gmx.de>
+
+import sys
+import json
+import hashlib
+from FriendlyArgumentParser import FriendlyArgumentParser
+from CSPRNG import CSPRNG
+
+parser = FriendlyArgumentParser(description = "Create a verifiably random permutation sequence.")
+parser.add_argument("-s", "--seed", metavar = "hexstr", action = "append", type = bytes.fromhex, default = [ ], help = "Add seed, in hex notation. Can be specified multiple times.")
+parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increases verbosity. Can be specified multiple times to increase.")
+parser.add_argument("permutation_json", help = "The permutation definition file in JSON format")
+args = parser.parse_args(sys.argv[1:])
+
+with open(args.permutation_json, "rb") as f:
+	perm_bin = f.read()
+
+perm = json.loads(perm_bin)
+if len(perm["all"]) > len(perm["any"]):
+	print("Not enough 'any' elements in permutation definition present. Cannot continue.")
+	sys.exit(1)
+
+perm_digest = hashlib.sha256(perm_bin).digest()
+if args.verbose >= 1:
+	print("Creating verifiably random permutation %s" % (perm_digest.hex()))
+
+prng = CSPRNG(perm_digest + b"".join(args.seed))
+prng.shuffle(perm["any"])
+for (x, y) in zip(perm["all"], perm["any"]):
+	print("%s - %s" % (x, y))
